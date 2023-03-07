@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Home
+{% endblock %}
+
+{% block main %}
+    {% for key in groups.keys() %}
+        <h2><a href="/group/{{ key }}">{{ groups[key]['name'] }}</a></h2>
+        {% for light in groups[key]['lights'] %}
+            <a href="/light/{{ light }}">{{ lights[light]['name'] }}</a><br>
+        {% endfor %}
+        <br><br>
+    {% endfor %}
+{% endblock %}

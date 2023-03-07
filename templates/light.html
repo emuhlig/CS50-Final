@@ -1,0 +1,266 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    {{ light['name'] }}
+{% endblock %}
+
+{% block main %}
+    <h1>{{ light['name'] }}</h1>    
+    <form>
+        <p>Power:</p>
+        <label class="switch">
+            <input type="checkbox" id="onoff">
+            <span class="toggle"></span>
+        </label>
+        <br><br>
+
+        <p>Hue mode:</p>
+        <label class="switch">
+            <input type="checkbox" id="cmode">
+            <span class="toggle"></span>
+        </label>
+        <br><br>
+
+        <p>adjust brightness:</p>
+        <input type="range" id="brightness">
+        <label for="brightness" id="briVal"></label>
+        <br><br>
+
+        <p>adjust hue:</p>
+        <input class="slider" type="range" id="hue">
+        <label for="hue" id="hueVal"></label>
+        <br><br>
+
+        <p>adjust saturation:</p>
+        <input type="range" id="saturation">
+        <label for="saturation" id="satVal"></label>
+        <br><br>
+
+        <p>adjust temperature:</p>
+        <input type="range" id="temp">
+        <label for="temp" id="tempVal"></label>
+    </form>
+
+    <script>
+        // Initialize light state attributes
+        let lightInfo = {{ light|tojson }};
+        let lightState = lightInfo['state'];
+        let brightness = lightState['bri'];
+        let hue = lightState['hue'];
+        let saturation = lightState['sat'];
+        let temp = lightState['ct'];
+        let lastInputTime = 0;
+        let lastCommandTime = 0;
+       
+        // Select HTML elements
+        const onoff = document.getElementById("onoff");
+        const cmode = document.getElementById("cmode");
+        const briVal = document.getElementById("briVal");
+        const hueVal = document.getElementById("hueVal");
+        const satVal = document.getElementById("satVal");
+        const tempVal = document.getElementById("tempVal");
+        const briSlider = document.getElementById("brightness");
+        const hueSlider = document.getElementById("hue");
+        const satSlider = document.getElementById("saturation");
+        const tempSlider = document.getElementById("temp");
+        const sliders = [briSlider, hueSlider, satSlider, tempSlider];
+
+        // Set minimum and maximum command values based on light API
+        const briMin = 1;
+        const briMax = 254;
+        const hueMin = 0;
+        const hueMax = 65535;
+        const satMin = 0;
+        const satMax = 254;
+        const tempMin = lightInfo['capabilities']['control']['ct']['min'];
+        const tempMax = lightInfo['capabilities']['control']['ct']['max'];
+
+        // Configure slider limits (default 0 to 100 if unspecified) and initial positions 
+        briSlider.min = 1; // Brightness command does not turn off light
+        briSlider.value = scale(brightness, briMin, briMax, briSlider.min, briSlider.max);
+        hueSlider.max = 360; // Degree scale
+        hueSlider.value = scale(hue, hueMin, hueMax, hueSlider.min, hueSlider.max);
+        satSlider.value = scale(saturation, satMin, satMax, satSlider.min, satSlider.max);
+        tempSlider.min = Math.round(1e6 / tempMax);
+        tempSlider.max = Math.round(1e6 / tempMin); // Convert mirek scale to standard kelvin
+        tempSlider.value = Math.round(1e6 / temp);
+
+        // Reduce granularity of any large sliders
+        for (let i = 0; i < sliders.length; i++) {
+            const range = sliders[i].max - sliders[i].min;
+            if (range >= 150) {
+                sliders[i].step = Math.round(range / 100);
+            }
+        }
+
+        // Initialize slider readouts and switch positions
+        onoff.checked = lightState['on'];
+        cmode.checked = (lightState['colormode'] == "hs");
+        briVal.innerHTML = `${briSlider.value}%`;
+        hueVal.innerHTML = `${hueSlider.value}°`;
+        satVal.innerHTML = `${satSlider.value}%`;
+        tempVal.innerHTML = `${tempSlider.value} K`;
+        
+        // Initialize page background
+        drawbg();
+
+        // Convert value in range min:max to the corresponding value in range 0:scale
+        function pct(value, min, max, scale = 100) {
+            return Math.round(scale * (value - min) / (max - min));
+        }
+
+        function scale(val, valMin, valMax, newMin = 0, newMax = 100) {
+            const valRange = valMax - valMin;
+            const newRange = newMax - newMin;
+            const relPos = (val - valMin) / valRange;
+            const newVal = newMin + relPos * newRange;
+            return Math.round(newVal);
+        }
+
+        // Convert value in range 0:scale to the corresponding value in range min:max
+        function scale(value, min, max, scale = 100) {
+            return min + Math.round((max - min) * value / scale);
+        }
+
+        // Throttle the rate of commands being sent to the light while ensuring final input is registered
+        function throttle() {
+            lastInputTime = Date.now();
+            timeSinceLastCommand = Date.now() - lastCommandTime;
+            if (timeSinceLastCommand > 250) {
+                lastCommandTime = Date.now();
+                command(payload);
+            } else {
+                setTimeout(function() {
+                    timeSinceLastInput = Date.now() - lastInputTime;
+                    if (timeSinceLastInput >= 200) {
+                        lastCommandTime = Date.now();
+                        command(payload);
+                    }
+                }, 200);
+            }
+        }
+
+        // Send POST request for server to forward to light, then update light state based on the response
+        function command(payload) {
+            fetch("{{ url_for('control', id=id) }}", {
+                    "method": "POST",
+                    "headers": {"Content-Type": "application/json"},
+                    "body": JSON.stringify(payload),
+                })
+                .then(response => response.json())
+                .then(updates => { 
+                    for (change in updates) {
+                        if (Object.keys(updates[change]).length > 2) {
+                            alert(JSON.stringify(updates[change]));
+                        } else {
+                            lightState[change] = updates[change];
+                        }
+                    }
+                    onoff.checked = lightState['on'];
+                    drawbg();
+                })
+        }
+
+        // Draw page background gradient based on current light state
+        function drawbg() {
+            let h = hueSlider.valueAsNumber;
+            let s = satSlider.valueAsNumber;
+            let lightness = 0;
+            if (onoff.checked) {
+                document.body.style.color = "black";
+                if (cmode.checked) {
+                    lightness = 50 + pct((satMax - saturation), satMin, satMax, 50);
+                } else {
+                    h = 33; // Approximate hue of incandescent (in deg)
+                    s = 50 + pct(temp, tempMin, tempMax, 50); //temp / 2;
+                    lightness = 50 + pct((tempMax - temp), 0, (tempMax - tempMin), 50);
+                }
+            } else {
+                document.body.style.color = "white";
+            }
+            console.log(`saturation ${s}\nlightness ${lightness}`)
+            let hsl = `hsl(${h}, ${s}%, ${lightness}%)`;
+            let glowPos = pct(brightness, briMin, briMax, 50);
+            let outerPos = 50 + 1.5 * glowPos;
+            let gradient = `radial-gradient(circle, ${hsl} ${glowPos}%, #333 ${outerPos}%)`;
+            document.body.style.backgroundImage = gradient;
+        }
+
+        // Brightness slider
+        briSlider.addEventListener("input", function(event) {
+            brightness = scale(briSlider.valueAsNumber, briMin, briMax);
+            briVal.innerHTML = `${briSlider.value}%`;
+            if (onoff.checked) {
+                payload = {"bri": brightness};
+                throttle();
+            }
+        });
+
+        // Hue slider
+        hueSlider.addEventListener("input", function(event) {
+            // cmode.checked = true;
+            hue = scale(hueSlider.valueAsNumber, hueMin, hueMax, hueSlider.max);
+            hueVal.innerHTML = `${hueSlider.value}°`;
+            if (onoff.checked && cmode.checked) {
+                payload = {"hue": hue};
+                throttle();
+            }
+        });
+
+        // Saturation slider
+        satSlider.addEventListener("input", function(event) {
+            // cmode.checked = true;
+            saturation = scale(satSlider.valueAsNumber, satMin, satMax);
+            satVal.innerHTML = `${satSlider.value}%`;
+            if (onoff.checked && cmode.checked) {
+                payload = {"sat": saturation};
+                throttle();
+            }
+        });
+
+        // Temperature slider
+        tempSlider.addEventListener("input", function(event) {
+            // cmode.checked = false;
+            temp = Math.round(1e6 / tempSlider.valueAsNumber);
+            tempVal.innerHTML = `${tempSlider.value} K`;
+            if (onoff.checked && !cmode.checked) {
+                payload = {"ct": temp};
+                throttle();
+            }
+        });
+
+        // Power switch
+        onoff.addEventListener("input", function(event) {
+            if (onoff.checked) {
+                payload = {
+                    "on": true,
+                    "bri": brightness,
+                };
+                if (cmode.checked) {
+                    payload["hue"] = hue;
+                    payload["sat"] = saturation;
+                } else {
+                    payload["ct"] = temp;
+                }
+            } else {
+                payload = {"on": false};
+            }
+            throttle();
+        });
+
+        // Color mode switch
+        cmode.addEventListener("input", function(event) {
+            if (cmode.checked) {
+                payload = {
+                    "hue": hue,
+                    "sat": saturation,
+                };
+            } else {
+                payload = {"ct": temp};
+            }
+            if (onoff.checked) {
+                throttle();
+            }
+        });
+    </script>
+{% endblock %}

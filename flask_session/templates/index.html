@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Home
+{% endblock %}
+
+{% block main %}
+    <h4>Total Account Balance: {{ (cash + portfolioValue) | usd }}</h4>
+    <h6>Available Cash: {{ cash | usd }}</h6>
+    <h6>Stock Value: {{ portfolioValue | usd }}</h6><br>
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Current Price</th>
+                <th>Number of Shares</th>
+                <th>Total Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for holding in portfolio %}
+                <tr>
+                    <td><a href="/quote?symbol={{ holding['symbol'] }}">{{ holding['symbol'] }}</a></td>
+                    <td> {{ holding['price'] | usd }}</td>
+                    <td> {{ holding['shares'] }}</td>
+                    <td> {{ holding['value'] | usd}}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

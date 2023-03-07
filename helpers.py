@@ -1,0 +1,72 @@
+import requests
+
+from flask import redirect, render_template, request, session
+from functools import wraps
+
+
+def apology(message, code=400):
+    """Render message as an apology to user."""
+    def escape(s):
+        """
+        Escape special characters.
+
+        https://github.com/jacebrowning/memegen#special-characters
+        """
+        for old, new in [("-", "--"), (" ", "-"), ("_", "__"), ("?", "~q"),
+                         ("%", "~p"), ("#", "~h"), ("/", "~s"), ("\"", "''")]:
+            s = s.replace(old, new)
+        return s
+    return render_template("apology.html", top=code, bottom=escape(message)), code
+
+
+def login_required(f):
+    """
+    Decorate routes to require login.
+
+    https://flask.palletsprojects.com/en/1.1.x/patterns/viewdecorators/
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session.get("user_id") is None:
+            return redirect("/login")
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def lookup(path):
+
+    # Contact API
+    api_key = "gw1Q3U1C4QiYvHggpcjf8zeAGDgheUw7Lcfx6zc2"
+    url = f"http://192.168.0.124/api/{api_key}/{path}"
+    try:    
+        response = requests.get(url)
+        response.raise_for_status()
+    except requests.RequestException:
+        return None
+
+    # Parse response
+    try:
+        quote = response.json()
+        return quote
+    except (KeyError, TypeError, ValueError):
+        return None
+    
+
+def sendCommand(path, payload):
+
+    # Contact API
+    api_key = "gw1Q3U1C4QiYvHggpcjf8zeAGDgheUw7Lcfx6zc2"
+    url = f"http://192.168.0.124/api/{api_key}/{path}"
+    try:
+        response = requests.put(url, payload)
+        response.raise_for_status()
+    except requests.RequestException:
+        return None
+
+    # Parse response
+    try:
+        quote = response.json()
+        return quote
+    except (KeyError, TypeError, ValueError):
+        return None
+    

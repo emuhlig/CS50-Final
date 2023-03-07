@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    {{ group['name'] }}
+{% endblock %}
+
+{% block main %}
+    <h1>{{ group['name'] }}</h1>
+    {% for id in group['lights'] %}
+        <a href="{{ url_for('light', id=id) }}">{{ lights[id]['name'] }}</a><br>
+    {% endfor %}
+{% endblock %}
