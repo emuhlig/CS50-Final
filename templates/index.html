@@ -1,15 +1,26 @@
 {% extends "layout.html" %}
 
 {% block title %}
-    Home
+    hueFX
 {% endblock %}
 
 {% block main %}
+    <!-- Group ID 0 is a hidden group from the Hue API that contains all lights -->
+    <form class="controller">
+        <h2><a href="/group/0">All Lights</a></h2>
+    </form>
+    <br><br>
+
+    <!-- Generate list of all groups and lights. Ignore group 200; might be for music sync feature -->
     {% for key in groups.keys() %}
-        <h2><a href="/group/{{ key }}">{{ groups[key]['name'] }}</a></h2>
-        {% for light in groups[key]['lights'] %}
-            <a href="/light/{{ light }}">{{ lights[light]['name'] }}</a><br>
-        {% endfor %}
-        <br><br>
+        {% if key != '200' %}
+            <form class="controller">   
+                <h2><a href="/group/{{ key }}">{{ groups[key]['name'] }}</a></h2>
+                {% for light in groups[key]['lights'] %}
+                    <h5><a class="clean" href="/light/{{ light }}">{{ lights[light]['name'] }}</a></h5>
+                {% endfor %}
+            </form> 
+            <br><br>
+        {% endif %}
     {% endfor %}
 {% endblock %}

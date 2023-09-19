@@ -1,0 +1,74 @@
+<form class="controller">
+    <div class="row mb-3">
+        <label class="col-6">Power</label>
+        <label for="brightness" class="col-4">Brightness</label>
+        <div class="col"></div>
+    </div>
+
+    <!-- Power switch and brightness slider -->
+    <div class="row mb-2">
+        <div class="col-6">
+            <label style="font-style:italic;">Off</label>
+            <label class="switch ms-2">
+                <input type="checkbox" id="onoff">
+                <span class="toggle"></span>
+            </label>
+            <label style="font-style:italic;" class="ms-1">On</label>
+        </div>
+        <div class="col-4"> 
+            <input class="mt-1" type="range" style="width: 100%" id="brightness">
+        </div>   
+        <label class="col text-start" id="briVal"></label>
+    </div>
+
+    <!-- If mode = color, hue label is visible -->
+    <!-- If mode = temp, this row is blank -->
+    <div class="row mb-2">
+        <div class="col-6"></div>
+        <label class="col-4" id="hueLabel">Hue</label>
+        <div class="col"></div>
+    </div>
+
+    <!-- Label for color mode -->
+    <div class="row mb-3">
+        <label class="col-6">Mode</label>
+
+        <!-- If mode = color, hue slider is visible -->
+        <!-- If mode = temp, temp label is visible -->
+        <div class="col-4">
+            <input class="slider" type="range" id="hue">
+            <label class="mt-2" id="tempLabel">Temperature</label>
+        </div>
+        <label class="col text-start" for="hue" id="hueVal"></label>
+    </div>
+
+    <!-- Color mode switch and labels -->
+    <div class="row">
+        <div class="col-6">
+            <label style="font-style:italic;">Temp</label>
+            <label class="switch ms-2">
+                <input type="checkbox" id="cmode">
+                <span class="toggle"></span>
+            </label>
+            <label style="font-style:italic;" class="ms-1">Color</label>
+        </div>
+
+        <!-- If mode = color, saturation label is visible -->
+        <!-- If mode = temp, temp slider is visible -->
+        <div class="col-4">
+            <input type="range" style="width: 100%" id="temp">
+            <label class="mt-2" id="satLabel">Saturation</label>
+        </div>
+        <label class="col text-start" for="temp" id="tempVal"></label>
+    </div>
+
+    <!-- If mode = color, saturation slider is visible -->
+    <!-- If mode = temp, this row is blank -->
+    <div class="row mb-3">
+        <div class="col-6"></div>
+        <div class="col-4">
+            <input class="mt-2" type="range" style="width: 100%" id="saturation">
+        </div>
+        <label class="col text-start" for="saturation" id="satVal"></label>
+    </div>
+</form>

@@ -36,20 +36,19 @@ def index():
     return render_template("index.html", groups=groups, lights=lights)
 
 
+@app.route("/light/<id>", methods=["GET", "POST"])
+@login_required
+def light(id):
+    light = lookup(f'lights/{id}')
+    return render_template("light.html", light=light, id=id)
+
+
 @app.route("/group/<id>")
 @login_required
 def group(id):
     group = lookup(f'groups/{id}')
     lights = lookup('lights')
-    return render_template("group.html", group=group, lights=lights)
-
-
-@app.route("/light/<id>", methods=["GET", "POST"])
-@login_required
-def light(id):
-    light = lookup(f'lights/{id}')
-    lightOn = light['state']['on']
-    return render_template("light.html", light=light, lightOn=lightOn, id=id)
+    return render_template("group.html", group=group, lights=lights, id=id)
 
 
 @app.route("/control/<id>", methods=["POST"])
@@ -57,13 +56,11 @@ def light(id):
 def control(id):
     # collect command from form
     payload = request.data
-    print(f'the payload is {payload}')
 
     # send JSON command to Hue hub
     response = sendCommand(f'lights/{id}/state', payload)
 
     # interpret Hue hub response
-    print(f'#### the response is {response}')
     updates = {}
     for item in response:
         for outcome in item:
@@ -79,7 +76,33 @@ def control(id):
                 updates[control] = error
     
     # inform client of new light state
-    print(f'#### the updates dict is {updates}')
+    return json.dumps(updates)
+
+@app.route("/controlGroup/<id>", methods=["POST"])
+@login_required
+def controlGroup(id):
+    # collect command from form
+    payload = request.data
+
+    # send JSON command to Hue hub
+    response = sendCommand(f'groups/{id}/action', payload)
+
+    # interpret Hue hub response
+    updates = {}
+    for item in response:
+        for outcome in item:
+            if outcome == 'success' or outcome == 'updated':
+                command = item[outcome]
+                for path in command:
+                    value = command[path]
+                    control = path.replace(f'/groups/{id}/action/', '')
+                    updates[control] = value
+            else:
+                error = item[outcome]
+                control = error['address'].replace(f'/groups/{id}/action/', '')
+                updates[control] = error
+    
+    # inform client of new light state
     return json.dumps(updates)
 
 

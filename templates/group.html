@@ -1,12 +1,124 @@
 {% extends "layout.html" %}
 
+<!-- For the 'All Lights' page, override the default 'Group 0' name used by API -->
 {% block title %}
-    {{ group['name'] }}
+    {% if id == '0' %}
+        All Lights
+    {% else %}
+        {{ group['name'] }}
+    {% endif %}
 {% endblock %}
 
 {% block main %}
-    <h1>{{ group['name'] }}</h1>
-    {% for id in group['lights'] %}
-        <a href="{{ url_for('light', id=id) }}">{{ lights[id]['name'] }}</a><br>
-    {% endfor %}
+    {% if id == '0' %}
+        <h2>All Lights</h2>
+    {% else %}
+        <h2>{{ group['name'] }}</h2>
+    {% endif %}
+
+    <!-- Load the light controller UI -->
+    <!-- Certain values are altered by JavaScript depending on color mode -->
+    {% include 'controller.html' %}
+
+    <script>
+        // Initialize light state attributes
+        let allLights = {{ lights|tojson }};
+        let groupInfo = {{ group|tojson }};
+        let groupAction = groupInfo['action'];
+
+        // Replace the seemingly random 'on' status of the group with the reliable 'any_on' parameter
+        groupAction['on'] = groupInfo['state']['any_on'];
+
+        // Initial values
+        let brightness = groupAction['bri'];
+        let saturation = groupAction['sat'];
+        let temp = groupAction['ct'];
+        let hue = groupAction['hue'];
+        let onCount = 0;
+        let groupTempMin = 10;
+        let groupTempMax = 1000;
+        let groupColorized = false;
+        let X = 0;
+        let Y = 0;
+        let briSum = 0;
+        let satSum = 0;
+        let ctSum = 0;
+
+        // Check the status of each light in the group
+        for (lightID of groupInfo['lights']) {
+            // Make sure we don't exceed the capability of any individual light
+            let lightTempMin = allLights[lightID]['capabilities']['control']['ct']['min'];
+            let lightTempMax = allLights[lightID]['capabilities']['control']['ct']['max'];
+            if (lightTempMin > groupTempMin) groupTempMin = lightTempMin;
+            if (lightTempMax < groupTempMax) groupTempMax = lightTempMax;
+
+            // Determine if any bulbs in group are in color mode
+            let lightState = allLights[lightID]['state'];
+            if (lightState['colormode'] == "hs" || lightState['colormode'] == "xy") {
+                groupColorized = true;
+            }
+
+            // Sum the attributes of visible lights for averaging
+            if (lightState['on']) {
+                briSum += lightState['bri'];
+                satSum += lightState['sat'];
+                ctSum += lightState['ct'];
+                
+                // Calculate average hue value, pt 1
+                // https://stackoverflow.com/q/13959276
+                hue = Math.round(360 * lightState['hue'] / 65535);
+                X += Math.cos(hue / 180 * Math.PI);
+                Y += Math.sin(hue / 180 * Math.PI);
+                onCount++;
+            }
+        }
+
+        // Initialize group UI values to the average of visible lights
+        if (onCount > 0) {
+            brightness = Math.floor(briSum/onCount);
+            saturation = Math.floor(satSum/onCount);
+            temp = Math.floor(ctSum/onCount);
+            
+            // Calculate average hue value, pt 2
+            // https://stackoverflow.com/q/13959276
+            X /= onCount;
+            Y /= onCount;
+            hue = Math.atan2(Y, X) * 180 / Math.PI;
+            if (hue < 0) hue += 360;
+            hue = Math.round(65535 * hue / 360);
+        }
+
+        // Set temp limits based on group capabilities
+        const tempMin = groupTempMin;
+        const tempMax = groupTempMax;
+
+        // Initialize slider readouts and switch positions
+        onoff.checked = groupInfo['state']['any_on'];
+        cmode.checked = groupColorized;
+
+        // Send POST request to server, then update group state based on the response
+        function command(payload) {
+            fetch("{{ url_for('controlGroup', id=id) }}", {
+                    "method": "POST",
+                    "headers": {"Content-Type": "application/json"},
+                    "body": JSON.stringify(payload),
+                })
+                .then(response => response.json())
+                .then(updates => { 
+                    for (change in updates) {
+                        if (Object.keys(updates[change]).length > 2) {
+                            alert(JSON.stringify(updates[change]));
+                        } else {
+                            groupAction[change] = updates[change];
+                        }
+                    }
+                    onoff.checked = groupAction['on'];
+                    drawBG();
+                })
+        }
+    </script>
+
+    <!-- Load JS common to light and group pages -->
+    <script src="{{ url_for('static', filename='common.js') }}"></script>
+
 {% endblock %}
